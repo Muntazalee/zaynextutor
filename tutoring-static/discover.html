@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discover · Zaynextutor</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
+</head>
+<body class="has-sidebar">
+  <aside class="glass-sidebar">
+    <div class="sidebar-brand" id="brand-logo-slot">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="discover.html" data-nav class="active">Discover</a>
+      <a href="my-learning.html" data-nav data-auth-only style="display:none;">My Learning</a>
+      <a href="teach.html" data-nav data-auth-only style="display:none;">Teach</a>
+      <a href="profile.html" data-nav data-auth-only style="display:none;">Profile</a>
+    </nav>
+    <div class="sidebar-user" data-auth-only style="display:none;">
+      <div class="avatar" data-user-initial>?</div>
+      <span data-user-name>User</span>
+    </div>
+    <div class="sidebar-user" data-guest-only>
+      <a href="login.html" style="font-weight:700;">Sign In</a>
+    </div>
+  </aside>
+
+  <div class="mobile-topbar">
+    <div class="mobile-topbar-brand">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+  </div>
+  <div id="mobile-menu-dropdown" class="mobile-menu-dropdown">
+      <a href="discover.html" data-nav class="active">Discover</a>
+      <a href="my-learning.html" data-nav data-auth-only style="display:none;">My Learning</a>
+      <a href="teach.html" data-nav data-auth-only style="display:none;">Teach</a>
+      <a href="profile.html" data-nav data-auth-only style="display:none;">Profile</a>
+      <a href="login.html" data-guest-only>Sign In</a>
+  </div>
+
+  <main class="main-panel">
+    <header class="app-header">
+      <h1 id="greeting">Good morning</h1>
+      <p>What are you working on today?</p>
+    </header>
+
+    <div id="flash-container"></div>
+
+    <div class="content">
+      <div class="search-card">
+        <input type="text" id="search-input" placeholder="Search courses, course codes or tutors...">
+      </div>
+
+      <section class="discover-section">
+        <div class="section-heading"><h3>Popular Courses</h3></div>
+        <div id="popular-courses" class="course-chip-row"></div>
+      </section>
+
+      <section class="discover-section">
+        <div class="section-heading"><h3>Recommended for You</h3></div>
+        <p id="recommend-hint" class="section-hint"></p>
+        <div id="recommended-courses" class="course-chip-row"></div>
+      </section>
+
+      <section class="discover-section">
+        <div class="section-heading"><h3>Find a Tutor</h3></div>
+        <div id="tutor-results" class="tutor-list"></div>
+        <div id="empty-state" class="empty-state" style="display:none;">
+          <p>No tutors found for that search yet.</p>
+        </div>
+      </section>
+    </div>
+  </main>  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    let myProfile = null;
+
+    function courseChip(course) {
+      const chip = document.createElement("a");
+      chip.className = "course-chip";
+      chip.href = `course.html?code=${encodeURIComponent(course.code)}`;
+      chip.innerHTML = `<span class="course-chip-code">${course.code}</span><span class="course-chip-name">${course.name}</span>`;
+      return chip;
+    }
+
+    async function loadPopularCourses() {
+      const { data: catalog } = await supabaseClient.from("course_catalog").select("*").limit(6);
+      const el = document.getElementById("popular-courses");
+      el.innerHTML = "";
+      (catalog || []).forEach((c) => el.appendChild(courseChip(c)));
+    }
+
+    async function loadRecommended() {
+      const hintEl = document.getElementById("recommend-hint");
+      const el = document.getElementById("recommended-courses");
+      if (!myProfile) {
+        hintEl.textContent = "Sign in to see courses picked for your department.";
+        el.innerHTML = "";
+        return;
+      }
+      hintEl.textContent = `Based on ${myProfile.department} · ${myProfile.level ? myProfile.level + " Level" : ""}`;
+      const { data: catalog } = await supabaseClient
+        .from("course_catalog")
+        .select("*")
+        .eq("department", myProfile.department);
+      el.innerHTML = "";
+      (catalog || []).forEach((c) => el.appendChild(courseChip(c)));
+      if (!catalog || catalog.length === 0) {
+        el.innerHTML = '<p class="section-hint">No recommendations yet for your department.</p>';
+      }
+    }
+
+    async function searchTutors(term) {
+      const listEl = document.getElementById("tutor-results");
+      const emptyEl = document.getElementById("empty-state");
+      listEl.innerHTML = "";
+
+      let query = supabaseClient
+        .from("courses")
+        .select("*, profiles(full_name, department, level), course_catalog(code, name)");
+
+      if (term) {
+        // Search matches course code/name via catalog join isn't filterable directly client-side pre-fetch,
+        // so fetch broadly then filter in JS against tutor name / course code / course name.
+      }
+
+      const { data: listings, error } = await query.order("created_at", { ascending: false }).limit(30);
+
+      if (error) {
+        showFlash(`Couldn't load tutors: ${error.message}`, "error");
+        return;
+      }
+
+      let filtered = listings || [];
+      if (term) {
+        const t = term.toLowerCase();
+        filtered = filtered.filter((l) =>
+          (l.profiles?.full_name || "").toLowerCase().includes(t) ||
+          (l.course_catalog?.code || "").toLowerCase().includes(t) ||
+          (l.course_catalog?.name || "").toLowerCase().includes(t)
+        );
+      }
+
+      if (filtered.length === 0) {
+        emptyEl.style.display = "";
+        return;
+      }
+      emptyEl.style.display = "none";
+
+      filtered.forEach((l) => {
+        const name = l.profiles?.full_name || "Unknown tutor";
+        const card = document.createElement("div");
+        card.className = "tutor-card";
+        card.setAttribute("role", "button");
+        card.setAttribute("tabindex", "0");
+        card.innerHTML = `
+          <div class="avatar">${name[0]?.toUpperCase() || "?"}</div>
+          <div class="tutor-info">
+            <p class="name">${name}</p>
+            <p class="meta">${l.course_catalog?.name || l.course_name || "Untitled Course"}</p>
+            <p class="meta">${l.level ? l.level + " Level" : "Level not set"}</p>
+          </div>
+          <span class="badge">${l.course_catalog?.code || l.course_code || ""}</span>
+        `;
+        const go = () => (window.location.href = `tutor.html?id=${l.tutor_id}`);
+        card.addEventListener("click", go);
+        card.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+        listEl.appendChild(card);
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      initMobileMenu();
+      await renderNav();
+      myProfile = await getCurrentProfile();
+
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+      document.getElementById("greeting").textContent = myProfile ? `${greeting}, ${myProfile.full_name.split(" ")[0]}` : greeting;
+
+      await loadPopularCourses();
+      await loadRecommended();
+      await searchTutors("");
+
+      let debounceTimer;
+      document.getElementById("search-input").addEventListener("input", (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => searchTutors(e.target.value.trim()), 300);
+      });
+    });
+  </script>
+</body>
+</html>

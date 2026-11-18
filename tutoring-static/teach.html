@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teach · Zaynextutor</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
+</head>
+<body class="has-sidebar">
+  <aside class="glass-sidebar">
+    <div class="sidebar-brand" id="brand-logo-slot">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav>My Learning</a>
+      <a href="teach.html" data-nav class="active">Teach</a>
+      <a href="profile.html" data-nav>Profile</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="avatar" data-user-initial>?</div>
+      <span data-user-name>User</span>
+    </div>
+  </aside>
+
+  <div class="mobile-topbar">
+    <div class="mobile-topbar-brand">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+  </div>
+  <div id="mobile-menu-dropdown" class="mobile-menu-dropdown">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav>My Learning</a>
+      <a href="teach.html" data-nav class="active">Teach</a>
+      <a href="profile.html" data-nav>Profile</a>
+      <a href="#" id="mobile-logout-link" data-auth-only style="display:none; color:#B3261E;">Sign Out</a>
+  </div>
+
+  <main class="main-panel">
+    <header class="app-header">
+      <h1 id="teach-header-title">Teach</h1>
+      <p id="teach-header-sub">Help someone learn.</p>
+    </header>
+    <div id="flash-container"></div>
+    <div class="content" id="teach-content"></div>
+  </main>  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    let session, myListings;
+
+    function renderOnboardingIntro() {
+      document.getElementById("teach-content").innerHTML = `
+        <div class="empty-hero">
+          <h2>Help someone learn.</h2>
+          <p class="section-hint">You already know things another student may be struggling with.</p>
+          <button id="become-tutor-btn" class="btn-primary" style="max-width:280px; margin-top:16px;">Become a Tutor</button>
+        </div>
+      `;
+      document.getElementById("become-tutor-btn").addEventListener("click", renderOnboardingForm);
+    }
+
+    async function renderOnboardingForm() {
+      document.getElementById("teach-header-title").textContent = "Become a Tutor";
+      document.getElementById("teach-header-sub").textContent = "Set up your first course listing";
+
+      const { data: catalog } = await supabaseClient.from("course_catalog").select("*").order("code");
+
+      const content = document.getElementById("teach-content");
+      content.innerHTML = `
+        <div class="form-card" style="max-width:520px;">
+          <div class="field">
+            <label>Course</label>
+            <select id="course-select">
+              <option value="" disabled selected>Select a course</option>
+              ${(catalog || []).map((c) => `<option value="${c.id}">${c.code} — ${c.name}</option>`).join("")}
+            </select>
+            <button type="button" id="toggle-new-course-btn" class="text-link-btn">Can't find your course? + Add it</button>
+          </div>
+
+          <div id="new-course-form" class="new-course-box" style="display:none;">
+            <div class="field">
+              <label>Course Code</label>
+              <input type="text" id="nc-code" placeholder="e.g. PHY103">
+            </div>
+            <div class="field">
+              <label>Course Name</label>
+              <input type="text" id="nc-name" placeholder="e.g. Electricity and Magnetism">
+            </div>
+            <div class="field">
+              <label>Faculty</label>
+              <select id="nc-faculty"></select>
+            </div>
+            <div class="field">
+              <label>Department</label>
+              <select id="nc-department"></select>
+            </div>
+            <div class="field">
+              <label>Level</label>
+              <select id="nc-level"></select>
+            </div>
+            <button type="button" id="save-new-course-btn" class="chip-link" style="width:100%; text-align:center; padding:12px;">Add Course to Catalog</button>
+          </div>
+
+          <div class="field">
+            <label>This listing is for which level of learner?</label>
+            <select id="listing-level"></select>
+            <p class="section-hint" style="margin-top:4px;">Shown on your course card so learners know who this is aimed at — defaults to the course's usual level, but adjust if you're teaching a different group.</p>
+          </div>
+          <div class="field">
+            <label>Topics you can help with</label>
+            <input type="text" id="topics-input" placeholder="e.g. Mechanics, Waves, Problem Solving (comma separated)">
+          </div>
+          <div class="field">
+            <label>Learning formats</label>
+            <div id="formats-container" class="format-check-group"></div>
+          </div>
+          <div class="field">
+            <label>Short introduction</label>
+            <textarea id="intro-input" placeholder="A sentence or two about how you teach"></textarea>
+          </div>
+          <button id="publish-btn" class="btn-primary">Publish Tutor Profile</button>
+        </div>
+      `;
+
+      populateFormatCheckboxes(document.getElementById("formats-container"), "format");
+      populateFacultyOptions(document.getElementById("nc-faculty"));
+      populateDepartmentOptionsForFaculty(document.getElementById("nc-department"), Object.keys(FACULTIES)[0]);
+      populateLevelOptions(document.getElementById("nc-level"));
+      populateLevelOptions(document.getElementById("listing-level"));
+
+      document.getElementById("course-select").addEventListener("change", (e) => {
+        const selected = catalog.find((c) => c.id === e.target.value);
+        if (selected) document.getElementById("listing-level").value = selected.level;
+      });
+
+      document.getElementById("nc-faculty").addEventListener("change", (e) => {
+        populateDepartmentOptionsForFaculty(document.getElementById("nc-department"), e.target.value);
+      });
+
+      const newCourseForm = document.getElementById("new-course-form");
+      document.getElementById("toggle-new-course-btn").addEventListener("click", () => {
+        newCourseForm.style.display = newCourseForm.style.display === "none" ? "block" : "none";
+      });
+
+      document.getElementById("save-new-course-btn").addEventListener("click", async () => {
+        const code = document.getElementById("nc-code").value.trim().toUpperCase();
+        const name = document.getElementById("nc-name").value.trim();
+        const faculty = document.getElementById("nc-faculty").value;
+        const department = document.getElementById("nc-department").value;
+        const level = document.getElementById("nc-level").value;
+
+        if (!code || !name || !faculty || !department || !level) {
+          showFlash("Fill in every field to add a course.", "error");
+          return;
+        }
+
+        const { data: newCourse, error } = await supabaseClient
+          .from("course_catalog")
+          .insert({ code, name, faculty, department, level })
+          .select()
+          .single();
+
+        if (error) {
+          if (error.message.includes("duplicate") || error.code === "23505") {
+            showFlash(`${code} already exists in the catalog — select it from the dropdown above.`, "error");
+          } else {
+            showFlash(`Couldn't add that course: ${error.message}`, "error");
+          }
+          return;
+        }
+
+        catalog.push(newCourse);
+        const select = document.getElementById("course-select");
+        const opt = document.createElement("option");
+        opt.value = newCourse.id;
+        opt.textContent = `${newCourse.code} — ${newCourse.name}`;
+        opt.selected = true;
+        select.appendChild(opt);
+        newCourseForm.style.display = "none";
+        showFlash(`${code} added to the catalog and selected.`, "success");
+      });
+
+      document.getElementById("publish-btn").addEventListener("click", async () => {
+        const courseId = document.getElementById("course-select").value;
+        const topics = document.getElementById("topics-input").value.trim();
+        const intro = document.getElementById("intro-input").value.trim();
+        const formats = [...document.querySelectorAll('#formats-container input[type="checkbox"]:checked')]
+          .map((cb) => cb.value).join(", ");
+
+        if (!courseId) {
+          showFlash("Please select a course.", "error");
+          return;
+        }
+
+        const catalogEntry = catalog.find((c) => c.id === courseId);
+        const listingLevel = document.getElementById("listing-level").value;
+        const { error } = await supabaseClient.from("courses").insert({
+          tutor_id: session.user.id,
+          course_id: courseId,
+          course_code: catalogEntry.code,
+          course_name: catalogEntry.name,
+          department: catalogEntry.department,
+          faculty: catalogEntry.faculty,
+          level: listingLevel || catalogEntry.level,
+          topics: topics || null,
+          formats: formats || null,
+          bio_note: intro || null,
+          availability: "accepting",
+        });
+
+        if (error) {
+          showFlash(`Couldn't publish: ${error.message}`, "error");
+          return;
+        }
+
+        showFlash("Tutor profile published!", "success");
+        loadDashboard();
+      });
+    }
+
+    async function loadDashboard() {
+      const { data: listings } = await supabaseClient
+        .from("courses")
+        .select("*, course_catalog(code, name)")
+        .eq("tutor_id", session.user.id);
+
+      myListings = listings || [];
+
+      if (myListings.length === 0) {
+        renderOnboardingIntro();
+        return;
+      }
+
+      document.getElementById("teach-header-title").textContent = "My Teaching";
+      document.getElementById("teach-header-sub").textContent = "Manage the courses you teach";
+
+      const { data: pendingRequests } = await supabaseClient
+        .from("requests")
+        .select("*, profiles(full_name), courses(course_code)")
+        .in("tutor_listing_id", myListings.map((l) => l.id))
+        .eq("status", "pending");
+
+      const content = document.getElementById("teach-content");
+      content.innerHTML = `
+        <div class="section-heading"><h3>Courses</h3></div>
+        <div id="my-course-list" class="learning-list"></div>
+
+        <div class="section-heading" style="margin-top:24px;"><h3>Pending Requests (${(pendingRequests || []).length})</h3></div>
+        <div id="pending-requests-list" class="learning-list"></div>
+
+        <div style="margin-top:24px;">
+          <button id="add-another-btn" class="btn-primary" style="max-width:260px;">+ Teach Another Course</button>
+        </div>
+      `;
+
+      const courseListEl = document.getElementById("my-course-list");
+      for (const listing of myListings) {
+        const { count } = await supabaseClient
+          .from("requests")
+          .select("*", { count: "exact", head: true })
+          .eq("tutor_listing_id", listing.id)
+          .eq("status", "accepted");
+
+        const row = document.createElement("div");
+        row.className = "learning-row";
+        row.innerHTML = `
+          <div>
+            <p class="name" style="margin:0;">${listing.course_catalog?.code || listing.course_code}</p>
+            <p class="meta">${count || 0} learner${count === 1 ? "" : "s"} · ${listing.availability === "accepting" ? "Accepting learners" : "Not accepting"}</p>
+          </div>
+          <div style="display:flex; gap:8px; flex-shrink:0;">
+            <button class="chip-link edit-listing-btn" data-id="${listing.id}">Edit</button>
+            <button class="chip-link delete-listing-btn" data-id="${listing.id}" style="background:#B3261E;">Delete</button>
+          </div>
+        `;
+        courseListEl.appendChild(row);
+      }
+
+      courseListEl.querySelectorAll(".edit-listing-btn").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const listing = myListings.find((l) => l.id === btn.dataset.id);
+          if (listing) renderEditForm(listing);
+        })
+      );
+      courseListEl.querySelectorAll(".delete-listing-btn").forEach((btn) =>
+        btn.addEventListener("click", () => deleteListing(btn.dataset.id))
+      );
+
+      const pendingEl = document.getElementById("pending-requests-list");
+      if (!pendingRequests || pendingRequests.length === 0) {
+        pendingEl.innerHTML = '<p class="section-hint">No pending requests.</p>';
+      } else {
+        pendingRequests.forEach((r) => {
+          const row = document.createElement("div");
+          row.className = "learning-row";
+          row.innerHTML = `
+            <div>
+              <p class="name" style="margin:0;">${r.profiles?.full_name || "A student"}</p>
+              <p class="meta">${r.courses?.course_code || ""}${r.message ? " · " + r.message : ""}</p>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="chip-link accept-btn" data-id="${r.id}">Accept</button>
+              <button class="chip-link decline-btn" data-id="${r.id}">Decline</button>
+            </div>
+          `;
+          pendingEl.appendChild(row);
+        });
+
+        pendingEl.querySelectorAll(".accept-btn").forEach((btn) =>
+          btn.addEventListener("click", () => updateRequest(btn.dataset.id, "accepted"))
+        );
+        pendingEl.querySelectorAll(".decline-btn").forEach((btn) =>
+          btn.addEventListener("click", () => updateRequest(btn.dataset.id, "declined"))
+        );
+      }
+
+      document.getElementById("add-another-btn").addEventListener("click", renderOnboardingForm);
+    }
+
+    async function deleteListing(listingId) {
+      if (!confirm("Remove this course listing? Learners will no longer see it.")) return;
+      const { error } = await supabaseClient.from("courses").delete().eq("id", listingId);
+      if (error) {
+        showFlash(`Couldn't remove that listing: ${error.message}`, "error");
+        return;
+      }
+      showFlash("Listing removed.", "success");
+      loadDashboard();
+    }
+
+    function renderEditForm(listing) {
+      document.getElementById("teach-header-title").textContent = "Edit Listing";
+      document.getElementById("teach-header-sub").textContent = listing.course_catalog?.code || listing.course_code;
+
+      const currentFormats = (listing.formats || "").split(",").map((f) => f.trim()).filter(Boolean);
+
+      const content = document.getElementById("teach-content");
+      content.innerHTML = `
+        <div class="form-card" style="max-width:520px;">
+          <div class="field">
+            <label>This listing is for which level of learner?</label>
+            <select id="edit-listing-level"></select>
+          </div>
+          <div class="field">
+            <label>Topics you can help with</label>
+            <input type="text" id="edit-topics-input" value="${(listing.topics || "").replace(/"/g, "&quot;")}" placeholder="e.g. Mechanics, Waves, Problem Solving">
+          </div>
+          <div class="field">
+            <label>Learning formats</label>
+            <div id="edit-formats-container" class="format-check-group"></div>
+          </div>
+          <div class="field">
+            <label>Short introduction</label>
+            <textarea id="edit-intro-input">${listing.bio_note || ""}</textarea>
+          </div>
+          <div class="field">
+            <label>Availability</label>
+            <select id="edit-availability">
+              <option value="accepting">Accepting learners</option>
+              <option value="not accepting">Not accepting right now</option>
+            </select>
+          </div>
+          <button id="save-edit-btn" class="btn-primary">Save Changes</button>
+          <button id="cancel-edit-btn" class="text-link-btn" style="margin-top:10px; display:block;">Cancel</button>
+        </div>
+      `;
+
+      populateLevelOptions(document.getElementById("edit-listing-level"), listing.level);
+      populateFormatCheckboxes(document.getElementById("edit-formats-container"), "edit-format", currentFormats);
+      document.getElementById("edit-availability").value = listing.availability;
+
+      document.getElementById("cancel-edit-btn").addEventListener("click", loadDashboard);
+
+      document.getElementById("save-edit-btn").addEventListener("click", async () => {
+        const level = document.getElementById("edit-listing-level").value;
+        const topics = document.getElementById("edit-topics-input").value.trim();
+        const intro = document.getElementById("edit-intro-input").value.trim();
+        const availability = document.getElementById("edit-availability").value;
+        const formats = [...document.querySelectorAll('#edit-formats-container input[type="checkbox"]:checked')]
+          .map((cb) => cb.value).join(", ");
+
+        const { error } = await supabaseClient.from("courses").update({
+          level,
+          topics: topics || null,
+          formats: formats || null,
+          bio_note: intro || null,
+          availability,
+        }).eq("id", listing.id);
+
+        if (error) {
+          showFlash(`Couldn't save changes: ${error.message}`, "error");
+          return;
+        }
+        showFlash("Listing updated.", "success");
+        loadDashboard();
+      });
+    }
+
+    async function updateRequest(requestId, status) {
+      const { error } = await supabaseClient.from("requests").update({ status }).eq("id", requestId);
+      if (error) {
+        showFlash(`Couldn't update request: ${error.message}`, "error");
+        return;
+      }
+      loadDashboard();
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      session = await requireAuth();
+      if (!session) return;
+      initMobileMenu();
+      await renderNav();
+      await loadDashboard();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile · Zaynextutor</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
+</head>
+<body class="has-sidebar">
+  <aside class="glass-sidebar">
+    <div class="sidebar-brand" id="brand-logo-slot">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav>My Learning</a>
+      <a href="teach.html" data-nav>Teach</a>
+      <a href="profile.html" data-nav class="active">Profile</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="avatar" data-user-initial>?</div>
+      <span data-user-name>User</span>
+    </div>
+  </aside>
+
+  <div class="mobile-topbar">
+    <div class="mobile-topbar-brand">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+  </div>
+  <div id="mobile-menu-dropdown" class="mobile-menu-dropdown">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav>My Learning</a>
+      <a href="teach.html" data-nav>Teach</a>
+      <a href="profile.html" data-nav class="active">Profile</a>
+      <a href="#" id="mobile-logout-link" data-auth-only style="display:none; color:#B3261E;">Sign Out</a>
+  </div>
+
+  <main class="main-panel">
+    <header class="app-header">
+      <h1>Profile</h1>
+      <p>Your Zaynextutor account</p>
+    </header>
+    <div id="flash-container"></div>
+
+    <div class="content">
+      <div class="profile-card">
+        <div class="profile-row"><span class="label">Name</span><span id="p-name">—</span></div>
+        <div class="profile-row"><span class="label">University</span><span id="p-university">—</span></div>
+        <div class="profile-row"><span class="label">Department</span><span id="p-department">—</span></div>
+        <div class="profile-row"><span class="label">Level</span><span id="p-level">—</span></div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-box">
+          <p class="stat-number" id="stat-learning">0</p>
+          <p class="stat-label">Learning</p>
+        </div>
+        <div class="stat-box">
+          <p class="stat-number" id="stat-teaching">0</p>
+          <p class="stat-label">Teaching</p>
+        </div>
+        <div class="stat-box">
+          <p class="stat-number" id="stat-helped">0</p>
+          <p class="stat-label">Students Helped</p>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:16px; margin-top:20px; align-items:center;">
+        <a href="edit-profile.html" style="color:var(--blue); font-weight:700; font-size:14px;">Edit Profile</a>
+        <a href="#" id="logout-link" style="color:#B3261E; font-weight:700; font-size:14px;">Sign Out</a>
+      </div>
+    </div>
+  </main>  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const session = await requireAuth();
+      if (!session) return;
+      initMobileMenu();
+      await renderNav();
+
+      const profile = await getCurrentProfile();
+      if (!profile) {
+        showFlash("Couldn't load your profile.", "error");
+        return;
+      }
+
+      document.getElementById("p-name").textContent = profile.full_name;
+      document.getElementById("p-university").textContent = profile.university || "—";
+      document.getElementById("p-department").textContent = profile.department;
+      document.getElementById("p-level").textContent = profile.level ? `${profile.level} Level` : "—";
+
+      const { count: learningCount } = await supabaseClient
+        .from("requests")
+        .select("*", { count: "exact", head: true })
+        .eq("learner_id", session.user.id)
+        .eq("status", "accepted");
+
+      const { data: myListings } = await supabaseClient.from("courses").select("id").eq("tutor_id", session.user.id);
+      const listingIds = (myListings || []).map((l) => l.id);
+
+      let teachingCount = (myListings || []).length;
+      let helpedCount = 0;
+      if (listingIds.length > 0) {
+        const { count } = await supabaseClient
+          .from("requests")
+          .select("*", { count: "exact", head: true })
+          .in("tutor_listing_id", listingIds)
+          .eq("status", "accepted");
+        helpedCount = count || 0;
+      }
+
+      document.getElementById("stat-learning").textContent = learningCount || 0;
+      document.getElementById("stat-teaching").textContent = teachingCount;
+      document.getElementById("stat-helped").textContent = helpedCount;
+
+      document.getElementById("logout-link").addEventListener("click", (e) => {
+        e.preventDefault();
+        logout();
+      });
+    });
+  </script>
+</body>
+</html>

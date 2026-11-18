@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up · Zaynextutor</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="auth-wrap desktop-center">
+    <div id="flash-container"></div>
+    <div class="auth-inner">
+      <div class="auth-copy">
+        <span class="brand-text auth-brand"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+        <h1>Join Zaynextutor</h1>
+        <p class="sub">Find who can teach you. Teach who needs you.</p>
+      </div>
+      <div class="form-card">
+        <form id="signup-form">
+          <div class="field"><label>Full Name</label><input type="text" id="full_name" required></div>
+          <div class="field"><label>Email</label><input type="email" id="email" required></div>
+          <div class="field"><label>Password</label><input type="password" id="password" minlength="6" required></div>
+          <div class="field"><label>University</label><input type="text" id="university" required></div>
+          <div class="field">
+            <label>Faculty</label>
+            <select id="faculty" required><option value="" disabled selected>Select faculty</option></select>
+          </div>
+          <div class="field">
+            <label>Department</label>
+            <select id="department" required><option value="" disabled selected>Select faculty first</option></select>
+          </div>
+          <div class="field">
+            <label>Level</label>
+            <select id="level" required><option value="" disabled selected>Select level</option></select>
+          </div>
+          <button type="submit" class="btn-primary">Create Account</button>
+        </form>
+        <p class="auth-switch">Already have an account? <a href="login.html">Sign In</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    populateFacultyOptions(document.getElementById("faculty"));
+    populateLevelOptions(document.getElementById("level"));
+
+    document.getElementById("faculty").addEventListener("change", (e) => {
+      populateDepartmentOptionsForFaculty(document.getElementById("department"), e.target.value);
+    });
+
+    document.getElementById("signup-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const full_name = document.getElementById("full_name").value.trim();
+      const university = document.getElementById("university").value.trim();
+      const faculty = document.getElementById("faculty").value;
+      const department = document.getElementById("department").value;
+      const level = document.getElementById("level").value;
+
+      if (!faculty || !department || !level) {
+        showFlash("Please select your faculty, department, and level.", "error");
+        return;
+      }
+
+      const { data, error } = await supabaseClient.auth.signUp({ email, password });
+      if (error) {
+        showFlash(`Sign up failed: ${error.message}`, "error");
+        return;
+      }
+
+      if (!data.session) {
+        showFlash("Account created! Check your email to confirm, then sign in.", "success");
+        setTimeout(() => (window.location.href = "login.html"), 2000);
+        return;
+      }
+
+      const { error: profileError } = await supabaseClient.from("profiles").insert({
+        id: data.user.id,
+        full_name,
+        university,
+        faculty,
+        department,
+        level,
+        role: "both",
+        contact_info: "",
+      });
+
+      if (profileError) {
+        showFlash(`Account created, but profile setup failed: ${profileError.message}`, "error");
+        return;
+      }
+
+      window.location.href = "discover.html";
+    });
+  </script>
+</body>
+</html>

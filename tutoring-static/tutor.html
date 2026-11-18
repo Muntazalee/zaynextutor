@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tutor Profile · Zaynextutor</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
+</head>
+<body class="has-sidebar">
+  <aside class="glass-sidebar">
+    <div class="sidebar-brand" id="brand-logo-slot">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav data-auth-only style="display:none;">My Learning</a>
+      <a href="teach.html" data-nav data-auth-only style="display:none;">Teach</a>
+      <a href="profile.html" data-nav data-auth-only style="display:none;">Profile</a>
+    </nav>
+    <div class="sidebar-user" data-auth-only style="display:none;">
+      <div class="avatar" data-user-initial>?</div>
+      <span data-user-name>User</span>
+    </div>
+    <div class="sidebar-user" data-guest-only>
+      <a href="login.html" style="font-weight:700;">Sign In</a>
+    </div>
+  </aside>
+
+  <div class="mobile-topbar">
+    <div class="mobile-topbar-brand">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+  </div>
+  <div id="mobile-menu-dropdown" class="mobile-menu-dropdown">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav data-auth-only style="display:none;">My Learning</a>
+      <a href="teach.html" data-nav data-auth-only style="display:none;">Teach</a>
+      <a href="profile.html" data-nav data-auth-only style="display:none;">Profile</a>
+      <a href="login.html" data-guest-only>Sign In</a>
+  </div>
+
+  <main class="main-panel">
+    <header class="app-header">
+      <h1 id="tutor-name">Tutor</h1>
+      <p id="tutor-meta">Loading...</p>
+    </header>
+    <div id="flash-container"></div>
+
+    <div class="content">
+      <div class="tutor-profile-card">
+        <div class="section-heading"><h3>About</h3></div>
+        <p id="tutor-about" class="page-sub" style="margin-bottom:4px;">—</p>
+        <p id="tutor-level-line" class="section-hint" style="margin-bottom:8px;"></p>
+        <p id="tutor-learner-count" class="section-hint" style="margin-bottom:20px; font-weight:700; color:var(--blue);"></p>
+
+        <div class="section-heading"><h3>I can help with</h3></div>
+        <div id="tutor-topics" class="topic-tags"></div>
+
+        <div class="section-heading" style="margin-top:20px;"><h3>Courses</h3></div>
+        <div id="tutor-courses" class="course-chip-row"></div>
+
+        <div class="section-heading" style="margin-top:20px;"><h3>Learning Formats</h3></div>
+        <div id="tutor-formats" class="topic-tags"></div>
+
+        <div id="connect-section" style="display:none; margin-top:20px;">
+          <div class="section-heading"><h3>How to Connect</h3></div>
+          <div id="connect-box" class="contact-box"></div>
+        </div>
+
+        <div class="section-heading" style="margin-top:20px;"><h3>Availability</h3></div>
+        <p id="tutor-availability" class="availability-pill">—</p>
+
+        <div class="section-heading" style="margin-top:20px;"><h3>Reviews</h3></div>
+        <div id="reviews-section">
+          <p class="section-hint">No reviews yet. Once learners finish studying with this tutor, their reviews will show up here.</p>
+        </div>
+
+        <div id="cta-area" style="margin-top:28px;"></div>
+      </div>
+    </div>
+  </main>
+
+  <div id="request-modal-backdrop" class="modal-backdrop" style="display:none;">
+    <div class="modal-card">
+      <button id="modal-close-btn" class="modal-close" aria-label="Close">&times;</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const tutorId = params.get("id");
+    let currentListing = null;
+    let myProfile = null;
+
+    async function load() {
+      if (!tutorId) return;
+
+      myProfile = await getCurrentProfile();
+      const isOwnProfile = myProfile && myProfile.id === tutorId;
+
+      const { data: profile } = await supabaseClient.from("profiles").select("*").eq("id", tutorId).single();
+      if (!profile) {
+        showFlash("Couldn't find this tutor.", "error");
+        return;
+      }
+
+      document.title = `${profile.full_name} · Zaynextutor`;
+      document.getElementById("tutor-name").textContent = profile.full_name;
+      document.getElementById("tutor-meta").textContent = profile.department;
+      document.getElementById("tutor-about").textContent = profile.bio || `${profile.full_name.split(" ")[0]} studies ${profile.department} at ${profile.university || "the university"}.`;
+      const levelLineEl = document.getElementById("tutor-level-line");
+      if (levelLineEl) {
+        levelLineEl.textContent = profile.level ? `${profile.level} Level student` : "";
+        levelLineEl.style.display = profile.level ? "" : "none";
+      }
+
+      const { data: listings } = await supabaseClient
+        .from("courses")
+        .select("*, course_catalog(code, name)")
+        .eq("tutor_id", tutorId);
+
+      const preferredCode = params.get("course");
+      currentListing = (listings || []).find((l) => l.course_catalog?.code === preferredCode) || (listings || [])[0];
+
+      const topicsEl = document.getElementById("tutor-topics");
+      const coursesEl = document.getElementById("tutor-courses");
+      const formatsEl = document.getElementById("tutor-formats");
+
+      const allTopics = new Set();
+      const allFormats = new Set();
+      (listings || []).forEach((l) => {
+        (l.topics || "").split(",").map((t) => t.trim()).filter(Boolean).forEach((t) => allTopics.add(t));
+        (l.formats || "").split(",").map((f) => f.trim()).filter(Boolean).forEach((f) => allFormats.add(f));
+        if (l.course_catalog) {
+          const chip = document.createElement("a");
+          chip.className = "course-chip";
+          chip.href = `course.html?code=${l.course_catalog.code}`;
+          chip.innerHTML = `<span class="course-chip-code">${l.course_catalog.code}</span>`;
+          coursesEl.appendChild(chip);
+        }
+      });
+
+      topicsEl.innerHTML = [...allTopics].map((t) => `<span class="topic-tag">${t}</span>`).join("") || '<span class="section-hint">No topics listed yet.</span>';
+      formatsEl.innerHTML = [...allFormats].map((f) => `<span class="topic-tag">${f}</span>`).join("") || '<span class="section-hint">Not specified.</span>';
+
+      const accepting = (listings || []).some((l) => l.availability === "accepting");
+      const availEl = document.getElementById("tutor-availability");
+      availEl.textContent = accepting ? "Accepting learners" : "Not accepting right now";
+      availEl.classList.toggle("accepting", accepting);
+
+      // "How to Connect" — only shown once a learning relationship exists,
+      // or to the tutor viewing their own profile. Strangers see the CTA instead.
+      // Total learners across every course this tutor teaches
+      const listingIds = (listings || []).map((l) => l.id);
+      if (listingIds.length > 0) {
+        const { count: learnerCount } = await supabaseClient
+          .from("requests")
+          .select("*", { count: "exact", head: true })
+          .in("tutor_listing_id", listingIds)
+          .eq("status", "accepted");
+        document.getElementById("tutor-learner-count").textContent =
+          `Helped ${learnerCount || 0} learner${learnerCount === 1 ? "" : "s"} so far`;
+      }
+
+      renderConnectInfo(profile, allFormats, isOwnProfile);
+      renderCta(profile, accepting, isOwnProfile);
+    }
+
+    function toHref(value, kind) {
+      const v = value.trim();
+      if (kind === "whatsapp") {
+        const digits = v.replace(/[^\d+]/g, "");
+        if (digits.replace(/\D/g, "").length >= 8) return `https://wa.me/${digits.replace(/\D/g, "")}`;
+        if (v.includes("@")) return `mailto:${v}`;
+        return null;
+      }
+      // group link
+      if (/^https?:\/\//i.test(v)) return v;
+      if (v.includes("chat.whatsapp.com")) return `https://${v.replace(/^\/+/, "")}`;
+      return null;
+    }
+
+    function renderConnectInfo(profile, formats, isOwnProfile) {
+      const section = document.getElementById("connect-section");
+      const box = document.getElementById("connect-box");
+      const hasGroupFormat = formats.has("WhatsApp Group") || formats.has("Physical Study Group");
+      const rows = [];
+
+      const groupLine = (label) => {
+        const href = profile.group_link ? toHref(profile.group_link, "group") : null;
+        const display = href
+          ? `<a href="${href}" target="_blank" rel="noopener" class="connect-link">${profile.group_link}</a>`
+          : `<span class="connect-link">${profile.group_link}</span>`;
+        return `<p style="margin:0 0 4px; font-size:12px; font-weight:700; color:var(--gray); text-transform:uppercase;">${label}</p><p style="margin:0 0 10px;">${display}</p>`;
+      };
+      const contactLine = (label) => {
+        const href = toHref(profile.contact_info, "whatsapp");
+        const display = href
+          ? `<a href="${href}" target="_blank" rel="noopener" class="connect-link">${profile.contact_info}</a>`
+          : `<span class="connect-link">${profile.contact_info}</span>`;
+        return `<p style="margin:0 0 4px; font-size:12px; font-weight:700; color:var(--gray); text-transform:uppercase;">${label}</p><p style="margin:0;">${display}</p>`;
+      };
+
+      if (isOwnProfile) {
+        if (hasGroupFormat && profile.group_link) rows.push(groupLine("Your Group Link"));
+        if (profile.contact_info) rows.push(contactLine("Your WhatsApp Contact"));
+        if (rows.length === 0) {
+          rows.push(`<p style="margin:0;">Add your contact info and group link in <a href="edit-profile.html" style="color:var(--blue); font-weight:700;">Edit Profile</a> so learners can reach you once you accept them.</p>`);
+        }
+      } else {
+        if (hasGroupFormat && profile.group_link) rows.push(groupLine("Join Group"));
+        if (profile.contact_info) rows.push(contactLine("WhatsApp Contact"));
+      }
+
+      if (rows.length > 0) {
+        box.innerHTML = rows.join("");
+        section.style.display = "block";
+      }
+    }
+
+    function renderCta(profile, accepting, isOwnProfile) {
+      const ctaArea = document.getElementById("cta-area");
+
+      if (isOwnProfile) {
+        ctaArea.innerHTML = `<p class="section-hint" style="margin:0;">This is your tutor profile. <a href="teach.html" style="color:var(--blue); font-weight:700;">Manage it in Teach →</a></p>`;
+        return;
+      }
+
+      if (!currentListing) {
+        ctaArea.innerHTML = "";
+        return;
+      }
+      const firstName = profile.full_name.split(" ")[0];
+      ctaArea.innerHTML = `<button id="learn-with-btn" class="btn-primary" ${accepting ? "" : "disabled"}>Learn with ${firstName}</button>`;
+      if (accepting) {
+        document.getElementById("learn-with-btn").addEventListener("click", () => openRequestModal(profile));
+      }
+    }
+
+    async function openRequestModal(profile) {
+      myProfile = myProfile || (await getCurrentProfile());
+      if (!myProfile) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      const backdrop = document.getElementById("request-modal-backdrop");
+      const body = document.getElementById("modal-body");
+      const courseLabel = currentListing.course_catalog?.code || "this course";
+
+      body.innerHTML = `
+        <p style="font-size:16px; font-weight:700; margin-bottom:6px;">You're about to connect with ${profile.full_name} for ${courseLabel}.</p>
+        <p class="section-hint" style="margin-bottom:16px;">Tell the tutor what you'd like help with.</p>
+        <textarea id="request-message" class="request-textarea" placeholder="e.g. I'm struggling with mechanics problems, could really use help before the test."></textarea>
+        <button id="send-request-btn" class="btn-primary" style="margin-top:16px;">Send Request</button>
+      `;
+      backdrop.style.display = "flex";
+
+      document.getElementById("send-request-btn").addEventListener("click", async () => {
+        const message = document.getElementById("request-message").value.trim();
+        const btn = document.getElementById("send-request-btn");
+        btn.disabled = true;
+        btn.textContent = "Sending...";
+
+        const { error } = await supabaseClient.from("requests").insert({
+          learner_id: myProfile.id,
+          tutor_listing_id: currentListing.id,
+          message: message || null,
+        });
+
+        if (error) {
+          body.innerHTML = `<p style="color:var(--error, #B3261E);">Couldn't send request: ${error.message}</p>`;
+          return;
+        }
+
+        body.innerHTML = `
+          <p style="font-size:16px; font-weight:700; margin-bottom:8px;">Request sent!</p>
+          <p class="section-hint">${profile.full_name} will see your request and can accept it. You'll find it under My Learning once they do.</p>
+          <a href="my-learning.html" class="btn-primary" style="display:block; text-align:center; margin-top:16px; text-decoration:none;">Go to My Learning</a>
+        `;
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      initMobileMenu();
+      await renderNav();
+      await load();
+
+      const backdrop = document.getElementById("request-modal-backdrop");
+      document.getElementById("modal-close-btn").addEventListener("click", () => (backdrop.style.display = "none"));
+      backdrop.addEventListener("click", (e) => { if (e.target === backdrop) backdrop.style.display = "none"; });
+    });
+  </script>
+</body>
+</html>

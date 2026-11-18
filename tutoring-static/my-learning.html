@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Learning · Zaynextutor</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
+</head>
+<body class="has-sidebar">
+  <aside class="glass-sidebar">
+    <div class="sidebar-brand" id="brand-logo-slot">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav class="active">My Learning</a>
+      <a href="teach.html" data-nav>Teach</a>
+      <a href="profile.html" data-nav>Profile</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="avatar" data-user-initial>?</div>
+      <span data-user-name>User</span>
+    </div>
+  </aside>
+
+  <div class="mobile-topbar">
+    <div class="mobile-topbar-brand">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+  </div>
+  <div id="mobile-menu-dropdown" class="mobile-menu-dropdown">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav class="active">My Learning</a>
+      <a href="teach.html" data-nav>Teach</a>
+      <a href="profile.html" data-nav>Profile</a>
+      <a href="#" id="mobile-logout-link" data-auth-only style="display:none; color:#B3261E;">Sign Out</a>
+  </div>
+
+  <main class="main-panel">
+    <header class="app-header">
+      <h1>My Learning</h1>
+      <p>Courses you're learning, and tutors you've reached out to</p>
+    </header>
+    <div id="flash-container"></div>
+
+    <div class="content">
+      <div class="section-heading"><h3>Active</h3></div>
+      <div id="active-list" class="learning-list"></div>
+
+      <div class="section-heading" style="margin-top:24px;"><h3>Pending Requests</h3></div>
+      <div id="pending-list" class="learning-list"></div>
+
+      <div id="empty-state" class="empty-state" style="display:none;">
+        <p>You haven't started learning anything yet.</p>
+        <p><a href="discover.html" style="color: var(--blue); font-weight: 700;">+ Find a Course</a></p>
+      </div>
+    </div>
+  </main>  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    async function load() {
+      const session = await requireAuth();
+      if (!session) return;
+
+      const { data: requests, error } = await supabaseClient
+        .from("requests")
+        .select("*, courses(*, profiles(full_name), course_catalog(code, name))")
+        .eq("learner_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        showFlash(`Couldn't load your learning: ${error.message}`, "error");
+        return;
+      }
+
+      const accepted = (requests || []).filter((r) => r.status === "accepted");
+      const pending = (requests || []).filter((r) => r.status === "pending");
+
+      const activeEl = document.getElementById("active-list");
+      const pendingEl = document.getElementById("pending-list");
+      const emptyEl = document.getElementById("empty-state");
+
+      if (accepted.length === 0 && pending.length === 0) {
+        emptyEl.style.display = "";
+      }
+
+      accepted.forEach((r) => {
+        const listing = r.courses;
+        const tutorName = listing?.profiles?.full_name || "Tutor";
+        const code = listing?.course_catalog?.code || "";
+        const row = document.createElement("div");
+        row.className = "learning-row";
+        row.innerHTML = `
+          <div>
+            <p class="name" style="margin:0;">${code} — ${listing?.course_catalog?.name || ""}</p>
+            <p class="meta">Learning with ${tutorName} · ${listing?.formats || "Format TBD"}</p>
+          </div>
+          <a href="tutor.html?id=${listing?.tutor_id}" class="chip-link">Open</a>
+        `;
+        activeEl.appendChild(row);
+      });
+      if (accepted.length === 0) {
+        activeEl.innerHTML = '<p class="section-hint">No active learning relationships yet.</p>';
+      }
+
+      pending.forEach((r) => {
+        const listing = r.courses;
+        const tutorName = listing?.profiles?.full_name || "Tutor";
+        const code = listing?.course_catalog?.code || "";
+        const row = document.createElement("div");
+        row.className = "learning-row";
+        row.innerHTML = `
+          <div>
+            <p class="name" style="margin:0;">${code} — ${listing?.course_catalog?.name || ""}</p>
+            <p class="meta">Waiting on ${tutorName} to accept</p>
+          </div>
+          <span class="badge" style="background:var(--lavender);">Pending</span>
+        `;
+        pendingEl.appendChild(row);
+      });
+      if (pending.length === 0) {
+        pendingEl.innerHTML = '<p class="section-hint">No pending requests.</p>';
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      initMobileMenu();
+      await renderNav();
+      await load();
+    });
+  </script>
+</body>
+</html>

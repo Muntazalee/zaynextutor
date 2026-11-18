@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Profile · Zaynextutor</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
+</head>
+<body class="has-sidebar">
+  <aside class="glass-sidebar">
+    <div class="sidebar-brand" id="brand-logo-slot">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav>My Learning</a>
+      <a href="teach.html" data-nav>Teach</a>
+      <a href="profile.html" data-nav class="active">Profile</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="avatar" data-user-initial>?</div>
+      <span data-user-name>User</span>
+    </div>
+  </aside>
+
+  <div class="mobile-topbar">
+    <div class="mobile-topbar-brand">
+            <span class="brand-text"><span class="brand-word">zayn<span class="brand-accent">ex</span></span><span class="brand-sub">TUTOR</span></span>
+    </div>
+    <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+  </div>
+  <div id="mobile-menu-dropdown" class="mobile-menu-dropdown">
+      <a href="discover.html" data-nav>Discover</a>
+      <a href="my-learning.html" data-nav>My Learning</a>
+      <a href="teach.html" data-nav>Teach</a>
+      <a href="profile.html" data-nav class="active">Profile</a>
+      <a href="#" id="mobile-logout-link" data-auth-only style="display:none; color:#B3261E;">Sign Out</a>
+  </div>
+
+  <main class="main-panel">
+    <header class="app-header">
+      <h1>Edit Profile</h1>
+      <p>Keep your academic details up to date</p>
+    </header>
+    <div id="flash-container"></div>
+
+    <div class="content">
+      <div class="form-card" style="max-width:460px;">
+        <div class="field"><label>Full Name</label><input type="text" id="full_name"></div>
+        <div class="field"><label>University</label><input type="text" id="university"></div>
+        <div class="field">
+          <label>Faculty</label>
+          <select id="faculty"></select>
+        </div>
+        <div class="field">
+          <label>Department</label>
+          <select id="department"></select>
+        </div>
+        <div class="field">
+          <label>Level</label>
+          <select id="level"></select>
+        </div>
+        <div class="field"><label>Bio (shown on your tutor profile)</label><textarea id="bio" placeholder="A sentence or two about you"></textarea></div>
+        <div class="field">
+          <label>WhatsApp Contact</label>
+          <input type="text" id="contact_info" placeholder="e.g. +234 812 345 6789">
+        </div>
+        <div class="field">
+          <label>Study Group Link (optional)</label>
+          <input type="text" id="group_link" placeholder="Paste your WhatsApp group invite link">
+          <p class="section-hint" style="margin-top:4px;">Shown to learners on courses where you've selected "WhatsApp Group" or "Physical Study Group" as a format — set it once here instead of per course.</p>
+        </div>
+        <button id="save-btn" class="btn-primary">Save Changes</button>
+      </div>
+
+      <div class="form-card" style="max-width:460px; margin-top:20px;">
+        <div class="section-heading"><h3 style="margin:0 0 12px;">Change Password</h3></div>
+        <div id="password-flash"></div>
+        <div class="field"><label>New Password</label><input type="password" id="new-password" minlength="6" placeholder="At least 6 characters"></div>
+        <div class="field"><label>Confirm New Password</label><input type="password" id="confirm-new-password" minlength="6"></div>
+        <button id="change-password-btn" class="btn-primary" style="background:var(--blue);">Update Password</button>
+      </div>
+    </div>
+  </main>  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const session = await requireAuth();
+      if (!session) return;
+      initMobileMenu();
+      await renderNav();
+
+      const profile = await getCurrentProfile();
+      if (!profile) return;
+
+      populateFacultyOptions(document.getElementById("faculty"), profile.faculty);
+      populateDepartmentOptionsForFaculty(document.getElementById("department"), profile.faculty, profile.department);
+      populateLevelOptions(document.getElementById("level"), profile.level);
+
+      document.getElementById("full_name").value = profile.full_name || "";
+      document.getElementById("university").value = profile.university || "";
+      document.getElementById("bio").value = profile.bio || "";
+      document.getElementById("contact_info").value = profile.contact_info || "";
+      document.getElementById("group_link").value = profile.group_link || "";
+
+      document.getElementById("faculty").addEventListener("change", (e) => {
+        populateDepartmentOptionsForFaculty(document.getElementById("department"), e.target.value);
+      });
+
+      document.getElementById("save-btn").addEventListener("click", async () => {
+        const updates = {
+          full_name: document.getElementById("full_name").value.trim(),
+          university: document.getElementById("university").value.trim(),
+          faculty: document.getElementById("faculty").value,
+          department: document.getElementById("department").value,
+          level: document.getElementById("level").value,
+          bio: document.getElementById("bio").value.trim() || null,
+          contact_info: document.getElementById("contact_info").value.trim(),
+          group_link: document.getElementById("group_link").value.trim() || null,
+        };
+
+        const { error } = await supabaseClient.from("profiles").update(updates).eq("id", session.user.id);
+        if (error) {
+          showFlash(`Couldn't save: ${error.message}`, "error");
+          return;
+        }
+        window.location.href = "profile.html";
+      });
+
+      document.getElementById("change-password-btn").addEventListener("click", async () => {
+        const newPassword = document.getElementById("new-password").value;
+        const confirmPassword = document.getElementById("confirm-new-password").value;
+        const flashEl = document.getElementById("password-flash");
+        flashEl.innerHTML = "";
+
+        if (!newPassword || newPassword.length < 6) {
+          flashEl.innerHTML = `<div class="flash error">Password must be at least 6 characters.</div>`;
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          flashEl.innerHTML = `<div class="flash error">Passwords don't match.</div>`;
+          return;
+        }
+
+        const { error: pwError } = await supabaseClient.auth.updateUser({ password: newPassword });
+        if (pwError) {
+          flashEl.innerHTML = `<div class="flash error">Couldn't update password: ${pwError.message}</div>`;
+          return;
+        }
+
+        flashEl.innerHTML = `<div class="flash success">Password updated.</div>`;
+        document.getElementById("new-password").value = "";
+        document.getElementById("confirm-new-password").value = "";
+      });
+    });
+  </script>
+</body>
+</html>
